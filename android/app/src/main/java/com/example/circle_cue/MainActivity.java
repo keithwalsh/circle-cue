@@ -1,4 +1,4 @@
-package com.example.flutter_basic_app;
+package com.example.circle_cue;
 
 import io.flutter.embedding.android.FlutterActivity;
 
