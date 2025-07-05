@@ -1,0 +1,303 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+
+void main() {
+  runApp(const NotesApp());
+}
+
+class NotesApp extends StatelessWidget {
+  const NotesApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      title: 'CircleCue',
+      debugShowCheckedModeBanner: false,
+      home: NotesHomePage(),
+    );
+  }
+}
+
+class NotesHomePage extends StatefulWidget {
+  const NotesHomePage({super.key});
+
+  @override
+  State<NotesHomePage> createState() => _NotesHomePageState();
+}
+
+class _NotesHomePageState extends State<NotesHomePage> {
+  final TextEditingController _noteController = TextEditingController();
+  List<String> _notes = [];
+  bool _isDarkMode = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notes = prefs.getStringList('notes') ?? [];
+      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+      _isLoading = false;
+    });
+    
+  }
+
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('notes', _notes);
+  }
+
+  Future<void> _saveTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', _isDarkMode);
+  }
+
+  void _addNote() {
+    final noteText = _noteController.text.trim();
+    if (noteText.isNotEmpty) {
+      setState(() {
+        _notes.insert(0, noteText); // Add to beginning (newest first)
+        _noteController.clear();
+      });
+      _saveNotes();
+    }
+  }
+
+  void _deleteNote(int index) {
+    setState(() {
+      _notes.removeAt(index);
+    });
+    _saveNotes();
+  }
+
+  void _toggleTheme() {
+    setState(() {
+      _isDarkMode = !_isDarkMode;
+    });
+    _saveTheme();
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning! ☀️';
+    } else if (hour < 17) {
+      return 'Good afternoon! 🌤️';
+    } else {
+      return 'Good evening! 🌙';
+    }
+  }
+
+  String _getTodaysDate() {
+    return DateFormat('EEEE, MMMM d, y').format(DateTime.now());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    final ThemeData theme = _isDarkMode
+        ? ThemeData(
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+          )
+        : ThemeData(
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+          );
+
+    return MaterialApp(
+      theme: theme,
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with greeting, date, and theme toggle
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getGreeting(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getTodaysDate(),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _toggleTheme,
+                      icon: Icon(
+                        _isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
+                        size: 28,
+                      ),
+                      tooltip: _isDarkMode ? 'Switch to light mode' : 'Switch to dark mode',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Quick note input section
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick note',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _noteController,
+                                decoration: InputDecoration(
+                                  hintText: 'Type a short reminder or idea...',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onSubmitted: (_) => _addNote(),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton(
+                              onPressed: _addNote,
+                              child: const Text('Add'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Notes list section
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your notes (${_notes.length})',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: _notes.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.note_add_outlined,
+                                      size: 64,
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No notes yet',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Add your first note above to get started',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _notes.length,
+                                itemBuilder: (context, index) {
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      title: Text(
+                                        _notes[index],
+                                        style: theme.textTheme.bodyLarge,
+                                      ),
+                                      trailing: IconButton(
+                                        onPressed: () => _deleteNote(index),
+                                        icon: const Icon(Icons.close),
+                                        tooltip: 'Delete note',
+                                        color: theme.colorScheme.error,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 4,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+} 
