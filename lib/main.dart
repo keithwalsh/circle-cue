@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'database/app_database.dart';
+import 'repositories/notes_repository.dart';
 
 void main() {
   runApp(const NotesApp());
@@ -28,35 +30,63 @@ class NotesHomePage extends StatefulWidget {
 
 class _NotesHomePageState extends State<NotesHomePage> {
   final TextEditingController _noteController = TextEditingController();
-  List<String> _notes = [];
+  List<Note> _notes = [];
   bool _isDarkMode = false;
   bool _isLoading = true;
+  late AppDatabase _database;
+  late NotesRepository _notesRepository;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initializeDatabase();
   }
 
   @override
   void dispose() {
     _noteController.dispose();
+    _database.close();
     super.dispose();
+  }
+
+  Future<void> _initializeDatabase() async {
+    _database = AppDatabase();
+    _notesRepository = NotesRepository(_database);
+    await _loadData();
   }
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _notes = prefs.getStringList('notes') ?? [];
-      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-      _isLoading = false;
-    });
     
-  }
-
-  Future<void> _saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('notes', _notes);
+    // Load theme preference
+    final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    
+    // Load notes from database
+    final notes = await _notesRepository.getAllNotes();
+    
+    // Migrate existing SharedPreferences notes to database if any exist
+    final existingNotes = prefs.getStringList('notes');
+    if (existingNotes != null && existingNotes.isNotEmpty && notes.isEmpty) {
+      // Migrate old notes to database
+      for (final noteContent in existingNotes.reversed) {
+        await _notesRepository.addNote(noteContent);
+      }
+      // Clear the old SharedPreferences data
+      await prefs.remove('notes');
+      // Reload notes from database after migration
+      final migratedNotes = await _notesRepository.getAllNotes();
+      setState(() {
+        _notes = migratedNotes;
+        _isDarkMode = isDarkMode;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _notes = notes;
+        _isDarkMode = isDarkMode;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _saveTheme() async {
@@ -64,22 +94,25 @@ class _NotesHomePageState extends State<NotesHomePage> {
     await prefs.setBool('isDarkMode', _isDarkMode);
   }
 
-  void _addNote() {
+  Future<void> _addNote() async {
     final noteText = _noteController.text.trim();
     if (noteText.isNotEmpty) {
-      setState(() {
-        _notes.insert(0, noteText); // Add to beginning (newest first)
-        _noteController.clear();
-      });
-      _saveNotes();
+      await _notesRepository.addNote(noteText);
+      _noteController.clear();
+      _refreshNotes();
     }
   }
 
-  void _deleteNote(int index) {
+  Future<void> _deleteNote(Note note) async {
+    await _notesRepository.deleteNote(note.id);
+    _refreshNotes();
+  }
+
+  Future<void> _refreshNotes() async {
+    final notes = await _notesRepository.getAllNotes();
     setState(() {
-      _notes.removeAt(index);
+      _notes = notes;
     });
-    _saveNotes();
   }
 
   void _toggleTheme() {
@@ -268,15 +301,16 @@ class _NotesHomePageState extends State<NotesHomePage> {
                             : ListView.builder(
                                 itemCount: _notes.length,
                                 itemBuilder: (context, index) {
+                                  final note = _notes[index];
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 8),
                                     child: ListTile(
                                       title: Text(
-                                        _notes[index],
+                                        note.content,
                                         style: theme.textTheme.bodyLarge,
                                       ),
                                       trailing: IconButton(
-                                        onPressed: () => _deleteNote(index),
+                                        onPressed: () => _deleteNote(note),
                                         icon: const Icon(Icons.close),
                                         tooltip: 'Delete note',
                                         color: theme.colorScheme.error,
