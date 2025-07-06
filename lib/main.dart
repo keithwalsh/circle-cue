@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'database/app_database.dart';
 import 'repositories/notes_repository.dart';
+import 'screens/people_screen.dart';
 
 void main() {
   runApp(const NotesApp());
@@ -33,6 +34,7 @@ class _NotesHomePageState extends State<NotesHomePage> {
   List<Note> _notes = [];
   bool _isDarkMode = false;
   bool _isLoading = true;
+  int _currentIndex = 0;
   late AppDatabase _database;
   late NotesRepository _notesRepository;
 
@@ -103,6 +105,50 @@ class _NotesHomePageState extends State<NotesHomePage> {
     }
   }
 
+  Future<void> _editNote(Note note) async {
+    final TextEditingController editController = TextEditingController(text: note.content);
+    
+    final result = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Edit Note'),
+          content: TextField(
+            controller: editController,
+            decoration: const InputDecoration(
+              hintText: 'Edit your note...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final editedText = editController.text.trim();
+                if (editedText.isNotEmpty) {
+                  Navigator.of(context).pop(editedText);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && result.isNotEmpty) {
+      await _notesRepository.updateNote(note.id, result);
+      _refreshNotes();
+    }
+    
+    editController.dispose();
+  }
+
   Future<void> _deleteNote(Note note) async {
     await _notesRepository.deleteNote(note.id);
     _refreshNotes();
@@ -171,165 +217,197 @@ class _NotesHomePageState extends State<NotesHomePage> {
       theme: theme,
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with greeting, date, and theme toggle
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: _currentIndex == 0 
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Header with greeting, date, and theme toggle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getGreeting(),
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _getTodaysDate(),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _toggleTheme,
+                          icon: Icon(
+                            _isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
+                            size: 28,
+                          ),
+                          tooltip: _isDarkMode ? 'Switch to light mode' : 'Switch to dark mode',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Quick note input section
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quick note',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _noteController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Type a short reminder or idea...',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    onSubmitted: (_) => _addNote(),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                FilledButton(
+                                  onPressed: _addNote,
+                                  child: const Text('Add'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Notes list section
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _getGreeting(),
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
+                            'Your notes (${_notes.length})',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _getTodaysDate(),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                            ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: _notes.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.note_add_outlined,
+                                          size: 64,
+                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'No notes yet',
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Add your first note above to get started',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    itemCount: _notes.length,
+                                    itemBuilder: (context, index) {
+                                      final note = _notes[index];
+                                      return Card(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        child: ListTile(
+                                          title: Text(
+                                            note.content,
+                                            style: theme.textTheme.bodyLarge,
+                                          ),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                onPressed: () => _editNote(note),
+                                                icon: const Icon(Icons.edit),
+                                                tooltip: 'Edit note',
+                                                color: theme.colorScheme.primary,
+                                              ),
+                                              IconButton(
+                                                onPressed: () => _deleteNote(note),
+                                                icon: const Icon(Icons.close),
+                                                tooltip: 'Delete note',
+                                                color: theme.colorScheme.error,
+                                              ),
+                                            ],
+                                          ),
+                                          onTap: () => _editNote(note),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 4,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: _toggleTheme,
-                      icon: Icon(
-                        _isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
-                        size: 28,
-                      ),
-                      tooltip: _isDarkMode ? 'Switch to light mode' : 'Switch to dark mode',
-                    ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
-                // Quick note input section
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Quick note',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _noteController,
-                                decoration: InputDecoration(
-                                  hintText: 'Type a short reminder or idea...',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onSubmitted: (_) => _addNote(),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FilledButton(
-                              onPressed: _addNote,
-                              child: const Text('Add'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Notes list section
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your notes (${_notes.length})',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: _notes.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.note_add_outlined,
-                                      size: 64,
-                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No notes yet',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add your first note above to get started',
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                itemCount: _notes.length,
-                                itemBuilder: (context, index) {
-                                  final note = _notes[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: ListTile(
-                                      title: Text(
-                                        note.content,
-                                        style: theme.textTheme.bodyLarge,
-                                      ),
-                                      trailing: IconButton(
-                                        onPressed: () => _deleteNote(note),
-                                        icon: const Icon(Icons.close),
-                                        tooltip: 'Delete note',
-                                        color: theme.colorScheme.error,
-                                      ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 4,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
+            )
+          : PeopleScreen(database: _database),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.note),
+              label: 'Notes',
             ),
-          ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people),
+              label: 'People',
+            ),
+          ],
         ),
       ),
     );

@@ -32,15 +32,14 @@ class NotesRepository {
   }
 
   // Update an existing note
-  Future<bool> updateNote(int id, String content) {
-    return _database.update(_database.notes).replace(
-      Note(
-        id: id,
-        content: content,
-        createdAt: DateTime.now(), // This will be overwritten by the existing value
-        updatedAt: DateTime.now(),
-      ),
-    );
+  Future<bool> updateNote(int id, String content) async {
+    final result = await (_database.update(_database.notes)
+          ..where((t) => t.id.equals(id)))
+        .write(NotesCompanion(
+          content: Value(content),
+          updatedAt: Value(DateTime.now()),
+        ));
+    return result > 0;
   }
 
   // Delete a note by ID
