@@ -20,11 +20,44 @@ class NotesRepository {
         .get();
   }
 
-  // Add a new note
-  Future<int> addNote(String content) {
+  // Get notes for a specific person ordered by creation date (newest first)
+  Stream<List<Note>> watchNotesForPerson(int personId) {
+    return (_database.select(_database.notes)
+      ..where((t) => t.personId.equals(personId))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
+  }
+
+  // Get notes for a specific person as a future (for one-time fetch)
+  Future<List<Note>> getNotesForPerson(int personId) {
+    return (_database.select(_database.notes)
+          ..where((t) => t.personId.equals(personId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  // Get global notes (where personId is null) ordered by creation date (newest first)
+  Stream<List<Note>> watchGlobalNotes() {
+    return (_database.select(_database.notes)
+      ..where((t) => t.personId.isNull())
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
+  }
+
+  // Get global notes as a future (for one-time fetch)
+  Future<List<Note>> getGlobalNotes() {
+    return (_database.select(_database.notes)
+          ..where((t) => t.personId.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  // Add a new note (global if personId is null, person-specific if personId is provided)
+  Future<int> addNote(String content, {int? personId}) {
     return _database.into(_database.notes).insert(
       NotesCompanion(
         content: Value(content),
+        personId: Value(personId),
         createdAt: Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
       ),
@@ -45,6 +78,12 @@ class NotesRepository {
   // Delete a note by ID
   Future<int> deleteNote(int id) {
     return (_database.delete(_database.notes)..where((t) => t.id.equals(id)))
+        .go();
+  }
+
+  // Delete all notes for a specific person
+  Future<int> deleteNotesForPerson(int personId) {
+    return (_database.delete(_database.notes)..where((t) => t.personId.equals(personId)))
         .go();
   }
 
