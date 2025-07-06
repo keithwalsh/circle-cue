@@ -6,17 +6,17 @@ class PersonRepository {
 
   PersonRepository(this._database);
 
-  // Get all people ordered by creation date (newest first)
+  // Get all people ordered alphabetically by name
   Stream<List<PeopleData>> watchAllPeople() {
     return (_database.select(_database.people)
-      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      ..orderBy([(t) => OrderingTerm.asc(t.name)]))
       .watch();
   }
 
-  // Get all people as a future (for one-time fetch)
+  // Get all people as a future (for one-time fetch) ordered alphabetically
   Future<List<PeopleData>> getAllPeople() {
     return (_database.select(_database.people)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
         .get();
   }
 
@@ -59,6 +59,30 @@ class PersonRepository {
   Future<PeopleData?> getPersonById(int id) {
     return (_database.select(_database.people)..where((t) => t.id.equals(id)))
         .getSingleOrNull();
+  }
+
+  // Add test data for verification
+  Future<void> addTestData() async {
+    // Clear existing data first
+    await deleteAllPeople();
+    
+    // Add test people in non-alphabetical order to verify sorting
+    final testPeople = [
+      'Zoe Williams',
+      'Alice Johnson',
+      'Bob Smith',
+      'Charlie Brown',
+      'David Davis',
+      'Emma Wilson',
+      'Frank Miller',
+      'Grace Lee',
+      'Henry Taylor',
+      'Ivy Chen',
+    ];
+    
+    for (String name in testPeople) {
+      await addPerson(name);
+    }
   }
 
   // Close the database connection

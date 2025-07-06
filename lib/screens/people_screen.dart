@@ -114,6 +114,63 @@ class _PeopleScreenState extends State<PeopleScreen> {
     }
   }
 
+  Future<void> _addTestData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Test Data'),
+          content: const Text('This will add 10 test people to verify alphabetical ordering. Any existing people will be removed.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _personRepository.addTestData();
+      _refreshPeople();
+    }
+  }
+
+  Future<void> _clearAllPeople() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear All People'),
+          content: const Text('Are you sure you want to delete all people? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Clear All'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _personRepository.deleteAllPeople();
+      _refreshPeople();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -130,6 +187,42 @@ class _PeopleScreenState extends State<PeopleScreen> {
       appBar: AppBar(
         title: Text('People (${_people.length})'),
         backgroundColor: theme.colorScheme.surfaceContainer,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'add_test_data':
+                  _addTestData();
+                  break;
+                case 'clear_all':
+                  _clearAllPeople();
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'add_test_data',
+                child: Row(
+                  children: [
+                    Icon(Icons.people),
+                    SizedBox(width: 8),
+                    Text('Add Test Data'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'clear_all',
+                child: Row(
+                  children: [
+                    Icon(Icons.clear_all),
+                    SizedBox(width: 8),
+                    Text('Clear All'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _people.isEmpty
           ? Center(
