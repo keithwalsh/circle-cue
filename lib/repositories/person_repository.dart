@@ -21,11 +21,12 @@ class PersonRepository {
   }
 
   // Add a new person
-  Future<int> addPerson(String name, {String? photoPath}) {
+  Future<int> addPerson(String name, {String? photoPath, String? tags}) {
     return _database.into(_database.people).insert(
       PeopleCompanion(
         name: Value(name),
         photoPath: Value(photoPath),
+        tags: Value(tags),
         createdAt: Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
       ),
@@ -33,12 +34,13 @@ class PersonRepository {
   }
 
   // Update an existing person
-  Future<bool> updatePerson(int id, String name, {String? photoPath}) async {
+  Future<bool> updatePerson(int id, String name, {String? photoPath, String? tags}) async {
     final result = await (_database.update(_database.people)
           ..where((t) => t.id.equals(id)))
         .write(PeopleCompanion(
           name: Value(name),
           photoPath: Value(photoPath),
+          tags: Value(tags),
           updatedAt: Value(DateTime.now()),
         ));
     return result > 0;

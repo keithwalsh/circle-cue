@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import '../database/app_database.dart';
 import '../repositories/person_repository.dart';
+import 'person_detail_screen.dart';
 
 class PeopleScreen extends StatefulWidget {
   final AppDatabase database;
@@ -171,6 +172,22 @@ class _PeopleScreenState extends State<PeopleScreen> {
     }
   }
 
+  Future<void> _navigateToPersonDetail(PeopleData person) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => PersonDetailScreen(
+          database: widget.database,
+          person: person,
+        ),
+      ),
+    );
+    
+    // Refresh the list if changes were made
+    if (result == true) {
+      _refreshPeople();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -260,6 +277,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
+                      onTap: () => _navigateToPersonDetail(person),
                       leading: CircleAvatar(
                         backgroundColor: theme.colorScheme.primaryContainer,
                         foregroundColor: theme.colorScheme.onPrimaryContainer,
