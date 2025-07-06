@@ -63,8 +63,8 @@ class _NotesHomePageState extends State<NotesHomePage> {
     // Load theme preference
     final isDarkMode = prefs.getBool('isDarkMode') ?? false;
     
-    // Load notes from database
-    final notes = await _notesRepository.getAllNotes();
+    // Load notes from database (only global notes, not person-specific)
+    final notes = await _notesRepository.getGlobalNotes();
     
     // Migrate existing SharedPreferences notes to database if any exist
     final existingNotes = prefs.getStringList('notes');
@@ -75,8 +75,8 @@ class _NotesHomePageState extends State<NotesHomePage> {
       }
       // Clear the old SharedPreferences data
       await prefs.remove('notes');
-      // Reload notes from database after migration
-      final migratedNotes = await _notesRepository.getAllNotes();
+      // Reload notes from database after migration (only global notes)
+      final migratedNotes = await _notesRepository.getGlobalNotes();
       setState(() {
         _notes = migratedNotes;
         _isDarkMode = isDarkMode;
@@ -155,7 +155,7 @@ class _NotesHomePageState extends State<NotesHomePage> {
   }
 
   Future<void> _refreshNotes() async {
-    final notes = await _notesRepository.getAllNotes();
+    final notes = await _notesRepository.getGlobalNotes();
     setState(() {
       _notes = notes;
     });

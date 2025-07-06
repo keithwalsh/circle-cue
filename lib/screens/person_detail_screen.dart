@@ -41,6 +41,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     _tagsController = TextEditingController(text: widget.person.tags ?? '');
     _newNoteController = TextEditingController();
     _photoPath = widget.person.photoPath;
+    
+    // Add listener to update button state when text changes
+    _newNoteController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
